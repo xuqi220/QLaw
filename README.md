@@ -50,6 +50,7 @@ QLaw项目旨在利用大模型为大众提供更加专业的中文法律服务�
                 --show_loss_step 10 \
                 --save_model_step 100
   ```
+  注意：lora训练后需要合并权重，见`merge_lora.py`
 
 
 
