@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 
 /data
+/glm3
 
 # C extensions
 *.so
