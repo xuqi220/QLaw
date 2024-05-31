@@ -1,4 +1,4 @@
-<img src="./assets/qlaw.png" style="height:100px">
+<img src="./assets/qlaw.png" style="height:120px">
 
 # QLaw-中文法律大模型
 QLaw项目旨在利用大模型为大众提供更加专业的中文法律服务，并希望在这个过程中和大家交流大模型的相关的知识，从而为社区提供更加优质的模型。欢迎大家follow,期待和大家一起学习进步。
