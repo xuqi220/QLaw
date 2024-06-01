@@ -65,4 +65,5 @@ QLaw项目旨在利用大模型为大众提供更加专业的中文法律服务�
 
 ## 致谢
 LexiLaw https://github.com/CSHaitao/LexiLaw
+
 LawGPT https://github.com/LiuHC0428/LAW-GPT
