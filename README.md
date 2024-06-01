@@ -29,7 +29,7 @@ QLaw项目旨在利用大模型为大众提供更加专业的中文法律服务�
 
 * Lora 训练方式：
   ```
-CUDA_VISIBLE_DEVICES=0,1,2 deepspeed --master_port 29500 train.py \
+  CUDA_VISIBLE_DEVICES=0,1,2 deepspeed --master_port 29500 train.py \
                 --ds_file ds_zero2_no_offload.json \
                 --train_file data/solver_sft.json \
                 --max_len 1560 \
