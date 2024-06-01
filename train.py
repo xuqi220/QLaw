@@ -4,6 +4,7 @@ import argparse
 import torch
 import json
 import math
+import os
 from tqdm.auto import tqdm
 from peft import LoraConfig, get_peft_model
 from torch.utils.data import Dataset, DataLoader, RandomSampler
@@ -54,20 +55,23 @@ def main():
     # 初始化分布式环境
     deepspeed.init_distributed()
     args.global_rank = torch.distributed.get_rank() # 0~word_size
-    
-    # print(f"local rank: {args.local_rank}  global rank: {args.global_rank}")
-        
+
+    if not os.path.exists(args.output_dir) and args.local_rank<=0:
+        os.mkdir(args.output_dir)
+
     set_random_seed(args.seed)
-    # print(f"{args.local_rank} arrive barrier")
+    
     # 阻塞进程，直到所有的进程到达
     torch.distributed.barrier() 
     
     # 加载tokenizer
+    print_rank_0("loading tokenizer...", args.local_rank)
     tokenizer = ChatGLMTokenizer.from_pretrained(args.model_path)
     print_rank_0(f"tokenizer.pad_token: {tokenizer.pad_token}")
     print_rank_0(f"tokenizer.eos_token: {tokenizer.eos_token}")
     
     # 加载lora模型
+    print_rank_0("loading model...", args.local_rank)
     model = ChatGLMForConditionalGeneration.from_pretrained(args.model_path)
     config = LoraConfig(
         r=args.lora_dim,
@@ -82,6 +86,7 @@ def main():
     model.config.torch_dtype = torch.float32
     print_trainable_parameters(model)
     # 加载数据集
+    print_rank_0("preparing dataset...", args.local_rank)
     train_dataset = GLMPromptDataSet(
         data_path=args.train_file,
         tokenizer=ChatGLMTokenizer.from_pretrained(args.model_path),
@@ -109,7 +114,7 @@ def main():
     ds_config['optimizer']['params']['betas'] = (0.9, 0.95)
     ds_config['optimizer']['params']['eps'] = 1e-8
     ds_config['optimizer']['params']['weight_decay'] = 0.1
-    num_train_steps = args.num_train_epoch * math.ceil(len(train_dataloader)/args.gradient_accumulation_steps)
+    num_train_steps = args.num_train_epoch * math.ceil(len(train_dataloader)/(args.gradient_accumulation_steps*args.train_batch_size_per_device))
     num_warmup_steps = int(args.warmup_ratio*num_train_steps)
     ds_config['scheduler']['params']['total_num_steps'] = num_train_steps
     ds_config['scheduler']['params']['warmup_num_steps'] = num_warmup_steps
@@ -123,9 +128,13 @@ def main():
         config=ds_config,
         dist_init_required=True
     )
-    # print(f"type of model {type(model)}")
+    
     global_step = 0
-    tr_loss, logging_loss, min_loss = 0.0, 0.0, 0.0
+    tr_loss, logging_loss = 0.0, 0.0
+    loss_rec = []
+    with open(f"{args.output_dir}/losses.txt", "w", encoding="utf-8") as fi:
+        fi.write(json.dumps(loss_rec))
+    print_rank_0("start training...", args.local_rank)
     for epoch in range(args.num_train_epoch):
         print_rank_0(f"Begining of Epoch {epoch+1}/{args.num_train_epoch}, Total Micro Batches {len(train_dataloader)}", args.local_rank)
         model.train()
@@ -143,16 +152,21 @@ def main():
                 global_step+=1
                 # 记录loss
                 if global_step % args.show_loss_step == 0:
+                    temp_loss = (tr_loss - logging_loss)/(args.show_loss_step * args.gradient_accumulation_steps)
+                    loss_rec.append(temp_loss)
                     print_rank_0(f"Epoch: {epoch} | "  
                                 f"mini_step: {mini_step + 1} | "
                                 f"global_step:{global_step} | " 
-                                f"loss: {(tr_loss - logging_loss)/(args.show_loss_step * args.gradient_accumulation_steps)} | "
+                                f"loss: {temp_loss} | "
                                 ,args.local_rank)
-                    print_rank_0(f"step: {mini_step + 1}-{global_step}-{model.global_steps}", args.global_rank)
+                    # print_rank_0(f"step: {mini_step + 1}-{global_step}-{model.global_steps}", args.global_rank)
                     if args.global_rank <= 0:
                         logging_loss = tr_loss
-        if args.global_rank <= 0:
-            save_model(model, tokenizer, args.output_dir, f"epoch-{epoch + 1}-step-{global_step}")
+                if args.global_rank <= 0 and global_step % args.save_model_step==0:
+                    save_model(model, tokenizer, args.output_dir, f"epoch-{epoch + 1}-step-{global_step}")
+    if args.local_rank<=0:
+        with open(f"{args.output_dir}/losses.txt") as fi:
+            fi.write(json.dumps(loss_rec))
                 
 if __name__ == "__main__":
     main()
