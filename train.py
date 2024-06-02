@@ -132,8 +132,6 @@ def main():
     global_step = 0
     tr_loss, logging_loss = 0.0, 0.0
     loss_rec = []
-    with open(f"{args.output_dir}/losses.txt", "w", encoding="utf-8") as fi:
-        fi.write(json.dumps(loss_rec))
     print_rank_0("start training...", args.local_rank)
     for epoch in range(args.num_train_epoch):
         print_rank_0(f"Begining of Epoch {epoch+1}/{args.num_train_epoch}, Total Micro Batches {len(train_dataloader)}", args.local_rank)
@@ -165,7 +163,7 @@ def main():
                 if args.global_rank <= 0 and global_step % args.save_model_step==0:
                     save_model(model, tokenizer, args.output_dir, f"epoch-{epoch + 1}-step-{global_step}")
     if args.local_rank<=0:
-        with open(f"{args.output_dir}/losses.txt") as fi:
+        with open(f"{args.output_dir}/losses.txt","w", encoding="utf-8") as fi:
             fi.write(json.dumps(loss_rec))
                 
 if __name__ == "__main__":
