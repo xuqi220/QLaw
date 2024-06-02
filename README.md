@@ -50,6 +50,10 @@ QLaw项目旨在利用大模型为大众提供更加专业的中文法律服务�
                 --show_loss_step 50 \
                 --save_model_step 50
   ```
+* Loss
+  
+  <img src="./assets/loss.png" style="width:550px">
+  
 
 
 
