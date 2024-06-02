@@ -25,9 +25,9 @@ QLaw项目旨在利用大模型为大众提供更加专业的中文法律服务�
 "output": "王某平在有期徒刑执行完毕后五年内再犯应当判处有期徒刑以上刑罚之罪，是累犯，依法应当从重处罚"
 }
 ```
-我们在该数据集上进行了微调，可利用本项目提供的`merge_lora.py`文件合并lora权重。另外我们也提供了完整权重的[百度网盘链接](https://pan.baidu.com/s/1gjObw73ZUWIN0KOGSLjlYw?pwd=hlyv)。
+我们在该数据集上进行了微调，可利用本项目提供的`merge_lora.py`文件合并lora权重。另外我们也提供了完整权重的[百度网盘链接](https://pan.baidu.com/s/1gjObw73ZUWIN0KOGSLjlYw?pwd=hlyv)。模型加载以及推理，请参考`inference.py`文件
 
-* Lora 训练方式：
+* Lora 训练：
   ```
   CUDA_VISIBLE_DEVICES=0,1,2 deepspeed --master_port 29500 train.py \
                 --ds_file ds_zero2_no_offload.json \
