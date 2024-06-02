@@ -30,7 +30,7 @@ def show_losses():
     ax1.spines['right'].set_visible(False)
     ax1.spines['left'].set_visible(False)
     ax1.tick_params(bottom=True, top=False, left=False, right=False)
-    ax1.patch.set_facecolor("whitesmoke") 
+    ax1.patch.set_facecolor("white") 
     # 第一条折线
     ax1.plot(x1, y1, 
             color="#72687E",# 颜色
@@ -40,10 +40,7 @@ def show_losses():
             )
     
     ax1.grid(axis='y') 
-    # ax1.legend()
-    
-    
-
     plt.show()
-
-show_losses()
+    
+if __name__=="__main__":
+    show_losses()
