@@ -7,7 +7,7 @@ from glm3.modeling_chatglm import ChatGLMForConditionalGeneration
 def set_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--ori_model_dir', default="glm3", type=str, help='')
-    parser.add_argument('--model_dir', default="solver/epoch-1-step-50", type=str, help='')
+    parser.add_argument('--model_dir', default="solver/epoch-3-step-31800", type=str, help='')
     return parser.parse_args()
 
 
