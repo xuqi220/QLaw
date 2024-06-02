@@ -54,6 +54,7 @@ QLaw项目旨在利用大模型为大众提供更加专业的中文法律服务�
   
   <img src="./assets/loss.png" style="width:550px">
   
+  😃好像还没过拟合，还能继续训练 
 
 
 
