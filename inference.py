@@ -10,14 +10,14 @@ def parse_args():
     # Model
     parser.add_argument("--device", type=str, default="0", help="")
     parser.add_argument("--mode", type=str, default="glm3", help="")
-    parser.add_argument("--model_path", type=str, default="solver/epoch-1-step-50", help="")
+    parser.add_argument("--model_path", type=str, default="modelfile_path", help="")
     parser.add_argument("--max_length", type=int, default=2048, help="")
     parser.add_argument("--do_sample", type=bool, default=True, help="")
     parser.add_argument("--top_p", type=float, default=0.8, help="")
     parser.add_argument("--temperature", type=float, default=0.8, help="")
     return parser.parse_args()
 
-def load_test_sample(path="data/solver_sft.json", idx=0):
+def load_test_sample(path="test_data_path", idx=0):
     data = []
     with open(path, "r", encoding="utf-8") as fi:
         for line in fi.readlines():
@@ -49,3 +49,4 @@ if __name__ == '__main__':
     print(f"事实描述： {input}\n")
     r = predict_one_sample(instruction, input, model, tokenizer, args)
     print(f"答案：{r}")
+    print(f"参考：{sample['output']}")

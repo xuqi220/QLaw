@@ -15,7 +15,7 @@ QLaw项目旨在利用大模型为大众提供更加专业的中文法律服务�
 本项目以GLM3-6B作为基座模型，利用DeepSpeed分布式训练工具以及Lora、P-tuning等技术，在法律领域数据集上进行微调。本项目分期进行，不断更新，欢迎一起学习进步！！！
 
 ### 第一期
-法律概念是法律推理（Legal Reasoning）以及法律在现实场景下应用的基石。我们从[中国裁判文书网](https://wenshu.court.gov.cn/) 收集了大量的刑事案件文书(已脱敏)，并抽取出适用的101条常用的法律概念，例如：自首、累犯、盗窃罪等等，以及针对现实场景的相应解释。数据格式如下：
+法律概念是法律推理（Legal Reasoning）以及法律在现实场景下应用的基石。我们从[中国裁判文书网](https://wenshu.court.gov.cn/) 收集了大量的刑事案件文书(已脱敏)，并抽取出适用的101条常用的法律概念，例如：自首、累犯、盗窃罪等等。数据格式如下：
 ```
 {
 "instruction": "你是一个律师，请解释为什么被告人王某平构成累犯?", 
@@ -25,7 +25,7 @@ QLaw项目旨在利用大模型为大众提供更加专业的中文法律服务�
 "output": "王某平在有期徒刑执行完毕后五年内再犯应当判处有期徒刑以上刑罚之罪，是累犯，依法应当从重处罚"
 }
 ```
-我们在该数据集上进行了微调，可利用本项目提供的`merge_lora.py`文件合并lora权重。另外我们也提供了完整权重的[百度网盘链接](https://pan.baidu.com/s/1gjObw73ZUWIN0KOGSLjlYw?pwd=hlyv)。模型加载以及推理，请参考`inference.py`文件
+我们在该数据集上进行了微调，可利用本项目提供的`merge_lora.py`文件合并lora权重。另外我们也提供了完整权重的[百度网盘链接](链接：https://pan.baidu.com/s/1VvSMNUqPzrwlLB6177cAVg?pwd=mm4v)。模型加载以及推理，请参考`inference.py`文件
 
 * Lora 训练：
   ```
@@ -59,6 +59,7 @@ QLaw项目旨在利用大模型为大众提供更加专业的中文法律服务�
 
 
 ## 致谢
+
 LexiLaw https://github.com/CSHaitao/LexiLaw
 
 LawGPT https://github.com/LiuHC0428/LAW-GPT
