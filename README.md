@@ -7,7 +7,7 @@ QLaw项目旨在利用大模型为大众提供更加专业的中文法律服务�
 
 💥 为复杂的多被告人指控预测任务设计的[Benchmark](https://github.com/welchxu/MCP)已被ACL2024主会录用。
 
-💥 第一期基于法律概念推理的法院观点生成方法已投稿EMNLP2024,后续会公布录用情况和源码。
+💥 第一期基于法律概念推理的法院[观点生成方法](https://github.com/xuqi220/LeGen)已被EMNLP2024 Findings录用。
 
 
 ## 项目介绍
