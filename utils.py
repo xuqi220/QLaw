@@ -1,11 +1,13 @@
+import sys
+sys.path.append("/home/kai/workspace")
 import os
 import json
 import torch
 import random
 import numpy as np
-from transformers import set_seed
+from transformers import set_seed, AutoTokenizer
 from torch.utils.data import Dataset, DataLoader
-from glm3.tokenization_chatglm import ChatGLMTokenizer
+from modelfiles.glm3.tokenization_chatglm import ChatGLMTokenizer
 
 
 def set_random_seed(seed):
@@ -100,8 +102,61 @@ class GLMPromptDataSet(Dataset):
     def __getitem__(self, item):
         instance = self.all_data[item]
         return instance
-    
 
+class Qwen2PromptDataSet(Dataset):
+    def __init__(self, data_path, tokenizer, max_len, max_src_len, is_skip):
+        self.all_data = []
+        skip_data_number = 0
+        with open(data_path, "r", encoding="utf-8") as fh:
+            for i, line in enumerate(fh):
+                sample = json.loads(line.strip())
+                skip_flag = False
+                t1 = tokenizer("<|im_end|>\n") # 2
+                t2 = tokenizer("<|im_end|>\n<|endoftext|>") # 3
+                src_text = "<|im_start|>system\n" + f"{sample['instruction']}<|im_end|>\n" + "<|im_start|>user\n" + sample["input"]
+                src_tokens = tokenizer(src_text, add_special_tokens=False)
+                if len(src_tokens['input_ids']) > max_src_len-2:
+                    # 当输入内容超长时，随向后截断
+                    for k, v in src_tokens.items():
+                        src_tokens[k] = v[:max_src_len-2]
+                    skip_flag = True
+                src_tokens['input_ids']+=t1['input_ids']
+                src_tokens['attention_mask']+=t1['attention_mask']
+                assert len(src_tokens['input_ids']) <= max_src_len
+                
+                max_tgt_len = max_len - len(src_tokens['input_ids']) - 3
+                tgt_tokens = tokenizer("<|im_start|>assistant\n" + sample["output"], add_special_tokens=False)
+                if len(tgt_tokens['input_ids']) > max_tgt_len:
+                    # 当输入内容超长时，随向后截断
+                    for k, v in tgt_tokens.items():
+                        tgt_tokens[k] = v[:max_tgt_len]
+                    skip_flag = True
+                tgt_tokens['input_ids']+=t2['input_ids']
+                tgt_tokens['attention_mask']+=t2['attention_mask']
+                
+                input_ids = src_tokens['input_ids']+tgt_tokens['input_ids']
+                attention_mask = src_tokens['attention_mask']+tgt_tokens['attention_mask']
+                labels = [-100]*len(src_tokens['input_ids']) + tgt_tokens['input_ids']
+        
+
+                assert len(input_ids) == len(labels)
+                assert len(input_ids) == len(attention_mask)
+                assert len(input_ids) <= max_len
+                
+                
+                if is_skip and skip_flag:
+                    skip_data_number += 1
+                    continue
+                self.all_data.append({"input_ids": input_ids, "attention_mask":attention_mask, "labels": labels})
+        print("the number of skipping data is {}".format(skip_data_number))
+
+    def __len__(self):
+        return len(self.all_data)
+
+    def __getitem__(self, item):
+        instance = self.all_data[item]
+        return instance
+    
 class DataCollator(object):
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
@@ -126,10 +181,18 @@ class DataCollator(object):
         return {"input_ids": torch.tensor(input_ids_batch, dtype=torch.long),
                 "labels": torch.tensor(labels_batch, dtype=torch.long)}
 
+
 if __name__=="__main__":
-    GLMPromptDataSet(
-        data_path="solver_sft.json",
-        tokenizer=ChatGLMTokenizer.from_pretrained("glm3"),
+    # GLMPromptDataSet(
+    #     data_path="llm_finetune/data/legal_concept_reasoning/solver_sft.json",
+    #     tokenizer=ChatGLMTokenizer.from_pretrained("modelfiles/glm3"),
+    #     max_len=1560,
+    #     max_src_len=1024,
+    #     is_skip=False
+    # )
+    Qwen2PromptDataSet(
+        data_path="llm_finetune/data/legal_concept_reasoning/solver_sft.json",
+        tokenizer=AutoTokenizer.from_pretrained("modelfiles/qwen2-7b"),
         max_len=1560,
         max_src_len=1024,
         is_skip=False

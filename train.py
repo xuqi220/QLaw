@@ -1,18 +1,20 @@
-
 import deepspeed
 import argparse
 import torch
 import json
 import math
 import os
+import sys
+sys.path.append("/home/kai/workspace/modelfiles")
 from tqdm.auto import tqdm
 from peft import LoraConfig, get_peft_model
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch.utils.data import Dataset, DataLoader, RandomSampler
 from torch.utils.data.distributed import DistributedSampler
-from utils import set_random_seed, print_rank_0, GLMPromptDataSet, DataCollator, print_trainable_parameters, to_device, save_model
-from glm3.modeling_chatglm import ChatGLMForConditionalGeneration
-from glm3.tokenization_chatglm import ChatGLMTokenizer 
-from glm3.configuration_chatglm import ChatGLMConfig
+from utils import set_random_seed, print_rank_0, GLMPromptDataSet, Qwen2PromptDataSet, DataCollator, print_trainable_parameters, to_device, save_model
+from modelfiles.glm3.modeling_chatglm import ChatGLMForConditionalGeneration
+from modelfiles.glm3.tokenization_chatglm import ChatGLMTokenizer 
+from modelfiles.glm3.configuration_chatglm import ChatGLMConfig
 
 
 def arg_parse():
@@ -56,44 +58,37 @@ def main():
     deepspeed.init_distributed()
     args.global_rank = torch.distributed.get_rank() # 0~word_size
 
+    # 处理文件夹
     if not os.path.exists(args.output_dir) and args.local_rank<=0:
         os.mkdir(args.output_dir)
 
+    # 设置随机种子
     set_random_seed(args.seed)
     
     # 阻塞进程，直到所有的进程到达
     torch.distributed.barrier() 
     
-    # 加载tokenizer
-    print_rank_0("loading tokenizer...", args.local_rank)
-    tokenizer = ChatGLMTokenizer.from_pretrained(args.model_path)
-    print_rank_0(f"tokenizer.pad_token: {tokenizer.pad_token}")
-    print_rank_0(f"tokenizer.eos_token: {tokenizer.eos_token}")
-    
-    # 加载lora模型
-    print_rank_0("loading model...", args.local_rank)
-    model = ChatGLMForConditionalGeneration.from_pretrained(args.model_path)
-    config = LoraConfig(
-        r=args.lora_dim,
-        lora_alpha=args.lora_alpha,
-        lora_dropout=args.lora_dropout,
-        target_modules=args.lora_module_name.split(','),
-        bias="none",
-        task_type="CAUSAL_LM",
-        inference_mode=False
-    )
-    model = get_peft_model(model, config)
-    model.config.torch_dtype = torch.float32
-    print_trainable_parameters(model)
-    # 加载数据集
-    print_rank_0("preparing dataset...", args.local_rank)
-    train_dataset = GLMPromptDataSet(
-        data_path=args.train_file,
-        tokenizer=ChatGLMTokenizer.from_pretrained(args.model_path),
-        max_len=1560,
-        max_src_len=1024,
-        is_skip=False
-    )
+    # 加载tokenizer 、模型、数据集 
+    print_rank_0("loading tokenizer, model and dataset...", args.local_rank)
+    if "glm3" in args.model_path:
+        tokenizer = ChatGLMTokenizer.from_pretrained(args.model_path)
+        model = ChatGLMForConditionalGeneration.from_pretrained(args.model_path)
+        train_dataset = GLMPromptDataSet(
+                        data_path=args.train_file,
+                        tokenizer=tokenizer,
+                        max_len=args.max_len,
+                        max_src_len=args.max_src_len,
+                        is_skip=False)
+    if "qwen2" in args.model_path:
+        tokenizer = AutoTokenizer.from_pretrained(args.model_path,use_fast=False, trust_remote_code=True)
+        model = AutoModelForCausalLM.from_pretrained(args.model_path,trust_remote_code=True)
+        train_dataset = Qwen2PromptDataSet(
+                        data_path=args.train_file,
+                        tokenizer=tokenizer,
+                        max_len=args.max_len,
+                        max_src_len=args.max_src_len,
+                        is_skip=False)
+    print_rank_0("preparing dataloader...", args.local_rank)
     train_sampler = DistributedSampler(train_dataset) # 分布式采样
     data_collator = DataCollator(tokenizer)
     train_dataloader = DataLoader(
@@ -102,8 +97,27 @@ def main():
         sampler=train_sampler,
         batch_size=args.train_batch_size_per_device
     )
+    print_rank_0(f"tokenizer.pad_token: {tokenizer.pad_token}")
+    print_rank_0(f"tokenizer.eos_token: {tokenizer.eos_token}")
+    
+    # 加载lora模型
+    print_rank_0("preparing lora model...", args.local_rank)
+    config = LoraConfig(
+        r=args.lora_dim,
+        lora_alpha=args.lora_alpha,
+        lora_dropout=args.lora_dropout,
+        target_modules=args.lora_module_name.split(','), # 值可以在peft/utils/constants.py文件TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING 或者打印模型权重名称
+        bias="none",
+        task_type="CAUSAL_LM",
+        inference_mode=False
+    )
+    model = get_peft_model(model, config)
+    model.config.torch_dtype = torch.float32
+    print_trainable_parameters(model)
+    
     
     # 加载deepspeed配置文件,从commandline获取deepspeed环境参数
+    print_rank_0("setting deepspeed..", args.local_rank)
     with open(args.ds_file, "r", encoding="utf-8") as fi:
         ds_config = json.load(fi)
     
@@ -122,18 +136,19 @@ def main():
     ds_config['scheduler']['params']['warmup_min_lr'] = 0.1*args.learning_rate
     
     # 初始化deepspeed
+    print_rank_0("init deepspeed model..", args.local_rank)
     model, optimizer, _, lr_scheduler = deepspeed.initialize(
         model=model,
         args=args,
         config=ds_config,
         dist_init_required=True
     )
-    
     global_step = 0
     tr_loss, logging_loss = 0.0, 0.0
     loss_rec = []
     print_rank_0("start training...", args.local_rank)
     for epoch in range(args.num_train_epoch):
+        train_dataloader.sampler.set_epoch(epoch)
         print_rank_0(f"Begining of Epoch {epoch+1}/{args.num_train_epoch}, Total Micro Batches {len(train_dataloader)}", args.local_rank)
         model.train()
         process_bar = tqdm(range(len(train_dataloader)))
@@ -152,7 +167,7 @@ def main():
                 if global_step % args.show_loss_step == 0:
                     temp_loss = (tr_loss - logging_loss)/(args.show_loss_step * args.gradient_accumulation_steps)
                     loss_rec.append(temp_loss)
-                    print_rank_0(f"Epoch: {epoch} | "  
+                    print_rank_0(f"Epoch: {epoch+1} | "  
                                 f"mini_step: {mini_step + 1} | "
                                 f"global_step:{global_step} | " 
                                 f"loss: {temp_loss} | "
